@@ -1,84 +1,195 @@
 // snake - Phaser.js Game
 
-class MainScene extends Phaser.Scene {
-    constructor() {
-        super({ key: 'MainScene' });
-    }
+let snake;
+let food;
+let cursors;
+let score = 0;
+let scoreText;
+let gameOver = false;
+let gridSize = 20;
+let cellSize = 20;
+let lastMove = 0;
+let moveDelay = 150;
 
-    preload() {
-        // Create simple textures programmatically
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        
-        // Player texture (blue square)
-        graphics.fillStyle(0x00d4ff);
-        graphics.fillRect(0, 0, 32, 32);
-        graphics.generateTexture('player', 32, 32);
-        
-        // Platform texture (green rectangle)
-        graphics.clear();
-        graphics.fillStyle(0x00ff88);
-        graphics.fillRect(0, 0, 400, 32);
-        graphics.generateTexture('platform', 400, 32);
-        
-        // Ground texture
-        graphics.clear();
-        graphics.fillStyle(0x333333);
-        graphics.fillRect(0, 0, 800, 64);
-        graphics.generateTexture('ground', 800, 64);
-    }
+function preload() {
+    // Load pixel art sprites
+    this.load.image('snake_head', 'assets/snake_head.png');
+    this.load.image('snake_body', 'assets/snake_body.png');
+    this.load.image('snake_tail', 'assets/snake_tail.png');
+    this.load.image('food', 'assets/food.png');
+    this.load.image('wall', 'assets/wall.png');
+}
 
-    create() {
-        // Background
-        this.cameras.main.setBackgroundColor('#1a1a2e');
-        
-        // Create ground
-        this.ground = this.physics.add.staticGroup();
-        this.ground.create(400, 568, 'ground').setScale(1).refreshBody();
-        
-        // Create platforms
-        this.platforms = this.physics.add.staticGroup();
-        this.platforms.create(400, 400, 'platform');
-        this.platforms.create(200, 250, 'platform').setScale(0.5, 1).refreshBody();
-        this.platforms.create(600, 220, 'platform').setScale(0.5, 1).refreshBody();
-        
-        // Create player
-        this.player = this.physics.add.sprite(100, 450, 'player');
-        this.player.setBounce(0.2);
-        this.player.setCollideWorldBounds(true);
-        
-        // Player physics properties
-        this.player.body.setGravityY(300);
-        
-        // Controls
-        this.cursors = this.input.keyboard.createCursorKeys();
-        
-        // Collisions
-        this.physics.add.collider(this.player, this.platforms);
-        this.physics.add.collider(this.player, this.ground);
-        
-        // Instructions text
-        this.add.text(16, 16, 'Arrow keys to move\nUp to jump', {
-            fontSize: '24px',
-            fill: '#ffffff',
-            fontFamily: 'Arial'
-        });
+function create() {
+    // Background
+    this.cameras.main.setBackgroundColor('#1a1a2e');
+    
+    // Create walls
+    this.walls = this.physics.add.staticGroup();
+    // Top wall
+    for (let i = 0; i < 40; i++) {
+        this.walls.create(i * cellSize + cellSize/2, cellSize/2, 'wall');
     }
+    // Bottom wall
+    for (let i = 0; i < 40; i++) {
+        this.walls.create(i * cellSize + cellSize/2, 580 + cellSize/2, 'wall');
+    }
+    // Left wall
+    for (let i = 0; i < 28; i++) {
+        this.walls.create(cellSize/2, i * cellSize + cellSize + cellSize/2, 'wall');
+    }
+    // Right wall
+    for (let i = 0; i < 28; i++) {
+        this.walls.create(780 + cellSize/2, i * cellSize + cellSize + cellSize/2, 'wall');
+    }
+    
+    // Create snake
+    snake = this.physics.add.group();
+    // Snake head
+    const head = this.physics.add.sprite(400, 300, 'snake_head');
+    head.setScale(0.8);
+    snake.add(head);
+    
+    // Initial body segments
+    for (let i = 1; i <= 3; i++) {
+        const segment = this.physics.add.sprite(400 - i * cellSize, 300, 'snake_body');
+        segment.setScale(0.8);
+        snake.add(segment);
+    }
+    
+    // Snake tail
+    const tail = this.physics.add.sprite(400 - 4 * cellSize, 300, 'snake_tail');
+    tail.setScale(0.8);
+    snake.add(tail);
+    
+    // Snake properties
+    this.snakeDirection = { x: cellSize, y: 0 };
+    this.nextDirection = { x: cellSize, y: 0 };
+    
+    // Create food
+    food = this.physics.add.sprite(200, 200, 'food');
+    food.setScale(0.8);
+    this.placeFood();
+    
+    // Score text
+    scoreText = this.add.text(16, 16, 'Score: 0', {
+        fontSize: '24px',
+        fill: '#ffffff',
+        fontFamily: 'Arial'
+    });
+    
+    // Controls
+    cursors = this.input.keyboard.createCursorKeys();
+    
+    // Collisions
+    this.physics.add.overlap(snake.children.entries[0], food, this.eatFood, null, this);
+    this.physics.add.collider(snake.children.entries[0], this.walls, this.hitWall, null, this);
+    this.physics.add.collider(snake.children.entries[0], snake, this.hitSelf, null, this);
+}
 
-    update() {
-        // Horizontal movement
-        if (this.cursors.left.isDown) {
-            this.player.setVelocityX(-160);
-        } else if (this.cursors.right.isDown) {
-            this.player.setVelocityX(160);
-        } else {
-            this.player.setVelocityX(0);
-        }
-        
-        // Jumping
-        if (this.cursors.up.isDown && this.player.body.touching.down) {
-            this.player.setVelocityY(-500);
-        }
+function update(time) {
+    if (gameOver) return;
+    
+    // Handle input
+    if (cursors.left.isDown && this.snakeDirection.x === 0) {
+        this.nextDirection = { x: -cellSize, y: 0 };
+    } else if (cursors.right.isDown && this.snakeDirection.x === 0) {
+        this.nextDirection = { x: cellSize, y: 0 };
+    } else if (cursors.up.isDown && this.snakeDirection.y === 0) {
+        this.nextDirection = { x: 0, y: -cellSize };
+    } else if (cursors.down.isDown && this.snakeDirection.y === 0) {
+        this.nextDirection = { x: 0, y: cellSize };
     }
+    
+    // Move snake
+    if (time > lastMove + moveDelay) {
+        this.snakeDirection = { ...this.nextDirection };
+        this.moveSnake();
+        lastMove = time;
+    }
+}
+
+function moveSnake() {
+    const head = snake.children.entries[0];
+    const segments = snake.children.entries;
+    
+    // Store previous positions
+    const prevPositions = segments.map(segment => ({ x: segment.x, y: segment.y }));
+    
+    // Move head
+    head.x += this.snakeDirection.x;
+    head.y += this.snakeDirection.y;
+    
+    // Move body segments
+    for (let i = 1; i < segments.length; i++) {
+        segments[i].x = prevPositions[i - 1].x;
+        segments[i].y = prevPositions[i - 1].y;
+    }
+    
+    // Rotate head based on direction
+    if (this.snakeDirection.x > 0) head.setRotation(0);
+    else if (this.snakeDirection.x < 0) head.setRotation(Math.PI);
+    else if (this.snakeDirection.y > 0) head.setRotation(Math.PI / 2);
+    else if (this.snakeDirection.y < 0) head.setRotation(-Math.PI / 2);
+}
+
+function placeFood() {
+    const gridWidth = 38;
+    const gridHeight = 26;
+    let x, y;
+    
+    do {
+        x = Math.floor(Math.random() * gridWidth) * cellSize + cellSize + cellSize/2;
+        y = Math.floor(Math.random() * gridHeight) * cellSize + cellSize + cellSize/2;
+    } while (this.isSnakePosition(x, y));
+    
+    food.setPosition(x, y);
+}
+
+function isSnakePosition(x, y) {
+    return snake.children.entries.some(segment => 
+        Math.abs(segment.x - x) < cellSize && Math.abs(segment.y - y) < cellSize
+    );
+}
+
+function eatFood() {
+    score += 10;
+    scoreText.setText('Score: ' + score);
+    
+    // Add new segment
+    const tail = snake.children.entries[snake.children.entries.length - 1];
+    const newSegment = this.physics.add.sprite(tail.x, tail.y, 'snake_body');
+    newSegment.setScale(0.8);
+    snake.add(newSegment);
+    
+    // Place new food
+    this.placeFood();
+    
+    // Speed up slightly
+    moveDelay = Math.max(100, moveDelay - 2);
+}
+
+function hitWall() {
+    this.endGame();
+}
+
+function hitSelf() {
+    this.endGame();
+}
+
+function endGame() {
+    gameOver = true;
+    this.add.text(400, 300, 'GAME OVER', {
+        fontSize: '48px',
+        fill: '#ff0000',
+        fontFamily: 'Arial'
+    }).setOrigin(0.5);
+    
+    this.add.text(400, 350, 'Press F5 to restart', {
+        fontSize: '24px',
+        fill: '#ffffff',
+        fontFamily: 'Arial'
+    }).setOrigin(0.5);
 }
 
 // Game configuration
@@ -91,11 +202,11 @@ const config = {
     physics: {
         default: 'arcade',
         arcade: {
-            gravity: { y: 500 },
+            gravity: { y: 0 },
             debug: false
         }
     },
-    scene: MainScene
+    scene: { preload, create, update }
 };
 
 // Initialize game
