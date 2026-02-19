@@ -12,63 +12,71 @@ let lastMove = 0;
 let moveDelay = 150;
 
 function preload() {
-    // Load pixel art sprites
-    this.load.image('snake_head', 'assets/snake_head.png');
-    this.load.image('snake_body', 'assets/snake_body.png');
-    this.load.image('snake_tail', 'assets/snake_tail.png');
-    this.load.image('food', 'assets/food.png');
-    this.load.image('wall', 'assets/wall.png');
+    // Load sprites
+    this.load.image('player', 'assets/player.png');
+    this.load.image('powerup', 'assets/powerup.png');
+    this.load.image('asteroid', 'assets/asteroid.png');
 }
 
 function create() {
     // Background
     this.cameras.main.setBackgroundColor('#1a1a2e');
     
-    // Create walls
+    // Create walls using asteroid sprites
     this.walls = this.physics.add.staticGroup();
     // Top wall
     for (let i = 0; i < 40; i++) {
-        this.walls.create(i * cellSize + cellSize/2, cellSize/2, 'wall');
+        const wall = this.walls.create(i * cellSize + cellSize/2, cellSize/2, 'asteroid');
+        wall.setScale(0.4);
+        wall.setTint(0x444444);
     }
     // Bottom wall
     for (let i = 0; i < 40; i++) {
-        this.walls.create(i * cellSize + cellSize/2, 580 + cellSize/2, 'wall');
+        const wall = this.walls.create(i * cellSize + cellSize/2, 580 + cellSize/2, 'asteroid');
+        wall.setScale(0.4);
+        wall.setTint(0x444444);
     }
     // Left wall
     for (let i = 0; i < 28; i++) {
-        this.walls.create(cellSize/2, i * cellSize + cellSize + cellSize/2, 'wall');
+        const wall = this.walls.create(cellSize/2, i * cellSize + cellSize + cellSize/2, 'asteroid');
+        wall.setScale(0.4);
+        wall.setTint(0x444444);
     }
     // Right wall
     for (let i = 0; i < 28; i++) {
-        this.walls.create(780 + cellSize/2, i * cellSize + cellSize + cellSize/2, 'wall');
+        const wall = this.walls.create(780 + cellSize/2, i * cellSize + cellSize + cellSize/2, 'asteroid');
+        wall.setScale(0.4);
+        wall.setTint(0x444444);
     }
     
-    // Create snake
+    // Create snake using player sprite
     snake = this.physics.add.group();
     // Snake head
-    const head = this.physics.add.sprite(400, 300, 'snake_head');
-    head.setScale(0.8);
+    const head = this.physics.add.sprite(400, 300, 'player');
+    head.setScale(0.6);
     snake.add(head);
     
     // Initial body segments
     for (let i = 1; i <= 3; i++) {
-        const segment = this.physics.add.sprite(400 - i * cellSize, 300, 'snake_body');
-        segment.setScale(0.8);
+        const segment = this.physics.add.sprite(400 - i * cellSize, 300, 'player');
+        segment.setScale(0.5);
+        segment.setTint(0x66ccff);
         snake.add(segment);
     }
     
     // Snake tail
-    const tail = this.physics.add.sprite(400 - 4 * cellSize, 300, 'snake_tail');
-    tail.setScale(0.8);
+    const tail = this.physics.add.sprite(400 - 4 * cellSize, 300, 'player');
+    tail.setScale(0.4);
+    tail.setTint(0x66ccff);
     snake.add(tail);
     
     // Snake properties
     this.snakeDirection = { x: cellSize, y: 0 };
     this.nextDirection = { x: cellSize, y: 0 };
     
-    // Create food
-    food = this.physics.add.sprite(200, 200, 'food');
-    food.setScale(0.8);
+    // Create food using powerup sprite
+    food = this.physics.add.sprite(200, 200, 'powerup');
+    food.setScale(0.6);
     this.placeFood();
     
     // Score text
@@ -158,8 +166,9 @@ function eatFood() {
     
     // Add new segment
     const tail = snake.children.entries[snake.children.entries.length - 1];
-    const newSegment = this.physics.add.sprite(tail.x, tail.y, 'snake_body');
-    newSegment.setScale(0.8);
+    const newSegment = this.physics.add.sprite(tail.x, tail.y, 'player');
+    newSegment.setScale(0.5);
+    newSegment.setTint(0x66ccff);
     snake.add(newSegment);
     
     // Place new food
